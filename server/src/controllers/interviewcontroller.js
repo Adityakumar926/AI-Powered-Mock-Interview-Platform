@@ -1,9 +1,7 @@
 const Groq = require("groq-sdk");
 const Interview = require("../models/Interview.js");
 
-const groq = new Groq({
-  apiKey: process.env.GROQ_API_KEY,
-});
+const getGroq = () => new Groq({ apiKey: process.env.GROQ_API_KEY });
 
 const systemPrompt = (domain) =>
   `
@@ -22,7 +20,7 @@ const startInterview = async (req, res) => {
     const { domain } = req.body;
     if (!domain) return res.status(400).json({ message: "Domain is required" });
 
-    const completion = await groq.chat.completions.create({
+    const completion = await getGroq().chat.completions.create({
       model: "llama-3.3-70b-versatile",
       messages: [
         { role: "system", content: systemPrompt(domain) },
@@ -77,7 +75,7 @@ const submitAnswer = async (req, res) => {
       return res.status(404).json({ message: "Session not found" });
 
     // 1️⃣ Generate feedback on the answer
-    const feedbackResponse = await groq.chat.completions.create({
+    const feedbackResponse = await getGroq().chat.completions.create({
       model: "llama-3.3-70b-versatile",
       messages: [
         {
@@ -118,7 +116,7 @@ Return ONLY the feedback, no additional text.`,
 
     // ── Complete path ──────────────────────────────────────
     if (isComplete) {
-      const scoreResponse = await groq.chat.completions.create({
+      const scoreResponse = await getGroq().chat.completions.create({
         model: "llama-3.3-70b-versatile",
         messages: [
           {
@@ -150,7 +148,7 @@ Answer: "${answer}"`,
     }
 
     // ── Continue path ──────────────────────────────────────
-    const nextQuestionResponse = await groq.chat.completions.create({
+    const nextQuestionResponse = await getGroq().chat.completions.create({
       model: "llama-3.3-70b-versatile",
       messages: [
         {
