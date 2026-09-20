@@ -26,7 +26,8 @@ interface AuthContextValue {
   isLoading: boolean;
   isLoggedIn: boolean;
   login: (email: string, password: string) => Promise<void>;
-  register: (name: string, email: string, password: string) => Promise<void>;
+  register: (name: string, email: string, password: string, role?: string) => Promise<void>;
+
   logout: () => void;
   refreshUser: () => Promise<void>;
 }
@@ -70,7 +71,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setTokenState(data.token);
         setUser(data.user);
 
-        router.push("/dashboard");
+        const userRole = data.user?.role || "Student";
+        if (userRole === "Mentor" || userRole === "Administrator") {
+          router.push("/rbac");
+        } else {
+          router.push("/dashboard");
+        }
       } finally {
         setIsLoading(false);
       }
@@ -80,13 +86,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // ── Register ────────────────────────────────────────────
   const register = useCallback(
-    async (name: string, email: string, password: string) => {
+    async (name: string, email: string, password: string, role?: string) => {
       setIsLoading(true);
       try {
         const { data } = await axiosInstance.post("/api/auth/register", {
           name,
           email,
           password,
+          role: role || "Student",
         });
 
         setToken(data.token);
@@ -94,13 +101,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setTokenState(data.token);
         setUser(data.user);
 
-        router.push("/dashboard");
+        const userRole = data.user?.role || "Student";
+        if (userRole === "Mentor" || userRole === "Administrator") {
+          router.push("/rbac");
+        } else {
+          router.push("/dashboard");
+        }
       } finally {
         setIsLoading(false);
       }
     },
     [router],
   );
+
 
   // ── Logout ──────────────────────────────────────────────
   const logout = useCallback(() => {

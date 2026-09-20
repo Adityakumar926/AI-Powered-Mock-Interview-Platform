@@ -63,10 +63,17 @@ export default function RBACManagementView() {
   }, [isLoggedIn, authLoading, router]);
 
   useEffect(() => {
+    if (user?.role) {
+      setActiveRole(user.role as any);
+    }
+  }, [user]);
+
+  useEffect(() => {
     if (isLoggedIn) {
       fetchRoleData(activeRole);
     }
   }, [isLoggedIn, activeRole]);
+
 
   const fetchRoleData = async (role: string) => {
     try {

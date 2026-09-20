@@ -6,6 +6,8 @@ import { useAuth } from "@/hooks/useAuth";
 import axiosInstance from "@/lib/axios";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import RBACManagementView from "@/components/RBACManagementView";
+
 
 interface Interview {
   id: string;
@@ -467,6 +469,11 @@ const page = () => {
   useEffect(() => {
     if (isLoggedIn) fetchInterviews();
   }, [isLoggedIn]);
+
+  if (isLoggedIn && (user?.role === "Mentor" || user?.role === "Administrator")) {
+    return <RBACManagementView />;
+  }
+
   const fetchInterviews = async () => {
     try {
       setDataLoading(true);

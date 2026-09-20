@@ -11,10 +11,12 @@ const page = () => {
     name: "",
     email: "",
     password: "",
+    role: "Student",
   });
   const { register, isLoading } = useAuth();
   const [error, setError] = useState("");
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData({ ...formData, [name]: value });
   };
@@ -24,11 +26,12 @@ const page = () => {
 
     setError("");
     try {
-      await register(formData.name, formData.email, formData.password);
+      await register(formData.name, formData.email, formData.password, formData.role);
     } catch (error) {
       setError("Failed to create account. Please try again.");
     }
   };
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background to-secondary px-4 py-8">
       <div className="w-full max-w-md">
@@ -112,6 +115,27 @@ const page = () => {
                 className="rounded-lg"
               />
             </div>
+
+            <div>
+              <label
+                htmlFor="role"
+                className="block text-sm font-semibold mb-2 text-foreground"
+              >
+                Select Account Role
+              </label>
+              <select
+                id="role"
+                name="role"
+                value={formData.role}
+                onChange={handleChange}
+                className="w-full bg-background border border-border/80 rounded-lg p-2.5 text-sm font-medium text-foreground focus:outline-none focus:border-primary"
+              >
+                <option value="Student">Candidate / Student 🎓</option>
+                <option value="Mentor">Technical Mentor 👨‍🏫</option>
+                <option value="Administrator">Platform Administrator 🛡️</option>
+              </select>
+            </div>
+
 
             <Button
               type="submit"

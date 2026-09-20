@@ -5,7 +5,9 @@ export interface StoredUser {
     id: string;
     name: string;
     email: string;
+    role?: "Student" | "Mentor" | "Administrator";
 }
+
 
 // ── Token ─────────────────────────────────────────────────
 export const getToken = (): string | null => {

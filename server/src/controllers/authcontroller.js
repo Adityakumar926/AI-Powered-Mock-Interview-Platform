@@ -13,7 +13,7 @@ const validatePasswordStrength = (password) => {
 // ── Register ──────────────────────────────────────────────
 const register = async (req, res) => {
   try {
-    const { name, email, password } = req.body;
+    const { name, email, password, role } = req.body;
 
     if (!name || !email || !password)
       return res.status(400).json({ message: "All fields are required" });
@@ -28,17 +28,20 @@ const register = async (req, res) => {
     if (exists)
       return res.status(409).json({ message: "Email already in use" });
 
-    const user = await User.create({ name, email, password });
+    const userRole = ["Student", "Mentor", "Administrator"].includes(role) ? role : "Student";
+
+    const user = await User.create({ name, email, password, role: userRole });
     const token = signToken(user._id.toString());
 
     res.status(201).json({
       token,
-      user: { id: user._id, name: user.name, email: user.email },
+      user: { id: user._id, name: user.name, email: user.email, role: user.role || "Student" },
     });
   } catch (err) {
     res.status(500).json({ message: "Server error", error: err.message });
   }
 };
+
 
 // ── Login with Account Lockout & Activity Tracking ────────
 const login = async (req, res) => {
@@ -125,9 +128,10 @@ const login = async (req, res) => {
 
     res.json({
       token,
-      user: { id: user._id, name: user.name, email: user.email },
+      user: { id: user._id, name: user.name, email: user.email, role: user.role || "Student" },
       sessionId,
     });
+
   } catch (err) {
     res.status(500).json({ message: "Server error", error: err.message });
   }
