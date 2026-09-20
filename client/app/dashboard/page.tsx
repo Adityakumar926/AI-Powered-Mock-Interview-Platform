@@ -92,15 +92,17 @@ function ResumePanel({
       formData.append("resume", file);
       const { data } = await axiosInstance.post(
         "/api/resume/analyze",
-        formData,
-        {
-          headers: { "Content-Type": "multipart/form-data" },
-        },
+        formData
       );
       setAnalysis(data.analysis);
       setStep("results");
     } catch (error: any) {
-      setError(error?.response?.data?.message);
+      const errMsg =
+        error?.response?.data?.error ||
+        error?.response?.data?.message ||
+        error?.message ||
+        "Failed to analyze resume. Please try again.";
+      setError(errMsg);
       setStep("upload");
     } finally {
       clearInterval(interval);
