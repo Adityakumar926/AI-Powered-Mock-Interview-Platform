@@ -11,12 +11,18 @@ export function Navbar() {
   const pathname = usePathname();
 
   const { isLoggedIn, user, logout } = useAuth();
+  const [mounted, setMounted] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   const isLandingPage = pathname === "/";
+
+  // Prevent SSR Hydration Mismatch
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Scroll detection
   useEffect(() => {
@@ -44,10 +50,11 @@ export function Navbar() {
 
   const isActive = (path: string) => pathname === path;
 
-  const initial = user?.name?.charAt(0).toUpperCase() ?? "U";
-  const firstName = user?.name?.split(" ")[0] ?? "there";
+  const showUserAuth = mounted && isLoggedIn;
+  const initial = (showUserAuth && user?.name?.charAt(0).toUpperCase()) || "U";
+  const firstName = (showUserAuth && user?.name?.split(" ")[0]) || "there";
 
-  const primaryNavLinks = isLoggedIn
+  const primaryNavLinks = showUserAuth
     ? [
         { href: "/dashboard", label: "Dashboard", icon: "⚡" },
         { href: "/practice", label: "Practice", icon: "🎯" },
@@ -110,21 +117,21 @@ export function Navbar() {
             {primaryNavLinks.map((link) => {
               const active = isActive(link.href);
               return (
-                <Link key={link.href} href={link.href}>
-                  <button
-                    className={`relative px-3.5 py-1.5 text-xs font-bold rounded-xl transition-all duration-200 ${
-                      active
-                        ? "bg-primary text-primary-foreground shadow-sm"
-                        : isLandingPage
-                        ? "text-neutral-300 hover:text-white hover:bg-white/10"
-                        : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
-                    }`}
-                  >
-                    <span className="flex items-center gap-1.5">
-                      <span>{link.icon}</span>
-                      {link.label}
-                    </span>
-                  </button>
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  className={`relative px-3.5 py-1.5 text-xs font-bold rounded-xl transition-all duration-200 ${
+                    active
+                      ? "bg-primary text-primary-foreground shadow-sm"
+                      : isLandingPage
+                      ? "text-neutral-300 hover:text-white hover:bg-white/10"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
+                  }`}
+                >
+                  <span className="flex items-center gap-1.5">
+                    <span>{link.icon}</span>
+                    {link.label}
+                  </span>
                 </Link>
               );
             })}
@@ -132,7 +139,7 @@ export function Navbar() {
 
           {/* ── Desktop Right Controls & User Dropdown ── */}
           <div className="hidden md:flex items-center gap-3">
-            {isLoggedIn ? (
+            {showUserAuth ? (
               <div className="relative" ref={dropdownRef}>
                 {/* User Pill Button */}
                 <button
@@ -253,7 +260,7 @@ export function Navbar() {
             </Link>
           ))}
 
-          {isLoggedIn && (
+          {showUserAuth && (
             <>
               <div className="h-px bg-border/40 my-2" />
               {userAccountLinks.map((item) => (
