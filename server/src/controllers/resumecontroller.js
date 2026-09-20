@@ -77,7 +77,7 @@ Rules:
 - confidence scores should be realistic and different for each domain
 `.trim();
         const response = await getGroq().chat.completions.create({
-            model: "llama-3.3-70b-versatile",
+            model: process.env.GROQ_MODEL || "groq/compound",
             messages: [{ role: "user", content: prompt }],
             temperature: 0.7,
         });
