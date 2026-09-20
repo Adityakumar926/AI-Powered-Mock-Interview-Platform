@@ -15,52 +15,66 @@ const DOMAINS = [
   "General",
 ];
 
-async function extractTextFromPDF(buffer) {
-  // 1. Fast digital PDF text extraction
-  try {
-    const uint8Array = new Uint8Array(buffer);
-    const parser = new PDFParse(uint8Array);
-    await parser.load();
-    const result = await parser.getText();
-    const extracted = typeof result === "string" ? result : result?.text;
-    if (extracted && extracted.trim().length > 30) {
-      return extracted;
+async function extractTextFromDocument(buffer, mimetype) {
+  // 1. If PDF file, use PDFParse
+  if (mimetype === "application/pdf") {
+    try {
+      const uint8Array = new Uint8Array(buffer);
+      const parser = new PDFParse(uint8Array);
+      await parser.load();
+      const result = await parser.getText();
+      const extracted = typeof result === "string" ? result : result?.text;
+      if (extracted && extracted.trim().length > 10) {
+        return extracted;
+      }
+    } catch (err) {
+      console.warn("PDFParse warning:", err.message);
     }
-  } catch (err) {
-    console.warn("PDFParse warning, trying Tesseract OCR fallback:", err.message);
   }
 
-  // 2. Tesseract OCR scan for scanned / image-based PDFs
-  try {
-    console.log("🔍 Scanning document with Tesseract OCR...");
-    const ocrResult = await Tesseract.recognize(buffer, "eng");
-    if (ocrResult?.data?.text && ocrResult.data.text.trim().length > 10) {
-      console.log("✅ Tesseract OCR successfully extracted text from image PDF.");
-      return ocrResult.data.text;
+  // 2. If image file (PNG/JPEG/WebP/BMP), run Tesseract OCR safely
+  if (mimetype && mimetype.startsWith("image/")) {
+    try {
+      console.log("🔍 Scanning image resume with Tesseract OCR...");
+      const ocrResult = await Tesseract.recognize(buffer, "eng");
+      if (ocrResult?.data?.text && ocrResult.data.text.trim().length > 10) {
+        return ocrResult.data.text;
+      }
+    } catch (ocrErr) {
+      console.warn("Tesseract OCR warning:", ocrErr.message);
     }
-  } catch (ocrErr) {
-    console.warn("Tesseract OCR warning:", ocrErr.message);
   }
 
-  // 3. Fallback raw string extraction
-  const rawStr = buffer.toString("binary");
-  const matches = rawStr.match(/[\x20-\x7E\s]{4,}/g);
-  return matches ? matches.join(" ") : buffer.toString("utf-8");
+  // 3. Fallback: extract clean human-readable words from buffer
+  const str = buffer.toString("utf-8").replace(/[^\x20-\x7E\n]/g, " ");
+  const words = str.match(/\b[A-Za-z][A-Za-z0-9+#.-]{1,}\b/g) || [];
+  const pdfKeywords = new Set([
+    "obj",
+    "endobj",
+    "stream",
+    "endstream",
+    "xref",
+    "trailer",
+    "startxref",
+    "PDF",
+  ]);
+  const cleanWords = words.filter(
+    (w) => !pdfKeywords.has(w) && !w.startsWith("PDF-") && w.length > 1,
+  );
+
+  return cleanWords.length > 5 ? cleanWords.join(" ") : "";
 } 
 const analyzeResume = async (req, res) => {
     try {
         if (!req.file) {
             return res.status(400).json({ error: "No file uploaded" });
         }
-        let resumeText;
-        if (req.file.mimetype === "application/pdf") {
-            const parsed = await extractTextFromPDF(req.file.buffer);
-            resumeText = parsed || "No text extracted from PDF.";
-        }else{
-            resumeText = req.file.buffer.toString("utf-8");
-        }
+        let resumeText = await extractTextFromDocument(
+          req.file.buffer,
+          req.file.mimetype,
+        );
         if (!resumeText || resumeText.trim().length < 10) {
-            resumeText = `Software Engineer Candidate Resume (${req.file.originalname}). Software engineering candidate with background in computer science, software development, data structures, and web technologies.`;
+          resumeText = `Software Engineer Candidate Resume (${req.file.originalname}). Software engineering candidate with background in computer science, software development, data structures, and web technologies.`;
         }
         const truncated=resumeText.slice(0, 6000);
          const prompt = `
