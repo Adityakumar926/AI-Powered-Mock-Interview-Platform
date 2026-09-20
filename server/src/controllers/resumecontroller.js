@@ -1,5 +1,6 @@
 const Groq = require("groq-sdk");
 const { PDFParse } = require("pdf-parse");
+const Tesseract = require("tesseract.js");
 
 const getGroq = () => new Groq({ apiKey: process.env.GROQ_API_KEY });
 
@@ -15,20 +16,33 @@ const DOMAINS = [
 ];
 
 async function extractTextFromPDF(buffer) {
+  // 1. Fast digital PDF text extraction
   try {
     const uint8Array = new Uint8Array(buffer);
     const parser = new PDFParse(uint8Array);
     await parser.load();
     const result = await parser.getText();
-    if (result && typeof result.text === "string" && result.text.trim()) {
-      return result.text;
-    }
-    if (typeof result === "string" && result.trim()) {
-      return result;
+    const extracted = typeof result === "string" ? result : result?.text;
+    if (extracted && extracted.trim().length > 30) {
+      return extracted;
     }
   } catch (err) {
-    console.warn("PDFParse warning, attempting raw string fallback:", err.message);
+    console.warn("PDFParse warning, trying Tesseract OCR fallback:", err.message);
   }
+
+  // 2. Tesseract OCR scan for scanned / image-based PDFs
+  try {
+    console.log("🔍 Scanning document with Tesseract OCR...");
+    const ocrResult = await Tesseract.recognize(buffer, "eng");
+    if (ocrResult?.data?.text && ocrResult.data.text.trim().length > 10) {
+      console.log("✅ Tesseract OCR successfully extracted text from image PDF.");
+      return ocrResult.data.text;
+    }
+  } catch (ocrErr) {
+    console.warn("Tesseract OCR warning:", ocrErr.message);
+  }
+
+  // 3. Fallback raw string extraction
   const rawStr = buffer.toString("binary");
   const matches = rawStr.match(/[\x20-\x7E\s]{4,}/g);
   return matches ? matches.join(" ") : buffer.toString("utf-8");
@@ -83,28 +97,48 @@ Rules:
 - domain label must exactly match one from the available domains list
 - confidence scores should be realistic and different for each domain
 `.trim();
-        const response = await getGroq().chat.completions.create({
-            model: process.env.GROQ_MODEL || "qwen/qwen3.8-27b",
-            messages: [{ role: "user", content: prompt }],
-            temperature: 0.7,
-        });
-        const raw=response.choices[0].message.content|| "{}";
-        let analysis;
-        try{
-            const jsonMatch = raw.match(/\{[\s\S]*\}/);
-            analysis = jsonMatch ? JSON.parse(jsonMatch[0]) : null;
-
-        }catch{
-            return res.status(500).json({ error: "Failed to parse analysis result" });
+        const modelsToTry = [
+          process.env.GROQ_MODEL || "qwen/qwen3.8-27b",
+          "groq/compound-mini",
+          "openai/gpt-oss-20b",
+        ];
+        let response;
+        for (const modelName of modelsToTry) {
+          try {
+            response = await getGroq().chat.completions.create({
+              model: modelName,
+              messages: [{ role: "user", content: prompt }],
+              temperature: 0.7,
+              max_tokens: 500,
+            });
+            if (response && response.choices && response.choices.length > 0) {
+              break;
+            }
+          } catch (modelErr) {
+            console.warn(`Model ${modelName} failed, trying next fallback:`, modelErr.message);
+          }
         }
-        const validDomains=DOMAINS
-        if(analysis && analysis.recommendedDomains){
-            analysis.recommendedDomains=analysis.recommendedDomains.filter(d=> validDomains.includes(d.label));
+        if (!response) {
+          return res.status(500).json({ error: "AI service currently busy. Please try again in a moment." });
+        }
+        const raw = response.choices[0].message.content || "{}";
+        let analysis;
+        try {
+          const jsonMatch = raw.match(/\{[\s\S]*\}/);
+          analysis = jsonMatch ? JSON.parse(jsonMatch[0]) : null;
+        } catch {
+          return res.status(500).json({ error: "Failed to parse analysis result" });
+        }
+        const validDomains = DOMAINS;
+        if (analysis && analysis.recommendedDomains) {
+          analysis.recommendedDomains = analysis.recommendedDomains.filter((d) =>
+            validDomains.includes(d.label)
+          );
         }
         res.json({ analysis });
     } catch (error) {
         console.error("Error analyzing resume:", error);
-        res.status(500).json({ error: "Internal server error" });
+        res.status(500).json({ error: error?.message || "Internal server error" });
     }
 }
 module.exports = {
