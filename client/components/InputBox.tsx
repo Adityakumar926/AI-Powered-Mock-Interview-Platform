@@ -6,10 +6,11 @@ import { Input } from "@/components/ui/input";
 
 interface InputBoxProps {
   onSend: (message: string) => void;
+  onSkip?: () => void;
   disabled?: boolean;
 }
 
-export function InputBox({ onSend, disabled }: InputBoxProps) {
+export function InputBox({ onSend, onSkip, disabled }: InputBoxProps) {
   const [input, setInput] = useState("");
 
   const handleSend = () => {
@@ -38,6 +39,17 @@ export function InputBox({ onSend, disabled }: InputBoxProps) {
           disabled={disabled}
           className="flex-1"
         />
+        {onSkip && (
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onSkip}
+            disabled={disabled}
+            className="border-amber-500/40 text-amber-600 dark:text-amber-400 hover:bg-amber-500/10"
+          >
+            Skip ⏭️
+          </Button>
+        )}
         <Button onClick={handleSend} disabled={disabled || !input.trim()}>
           Send
         </Button>
@@ -45,3 +57,4 @@ export function InputBox({ onSend, disabled }: InputBoxProps) {
     </div>
   );
 }
+
