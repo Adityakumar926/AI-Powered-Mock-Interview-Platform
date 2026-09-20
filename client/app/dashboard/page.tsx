@@ -460,20 +460,6 @@ const page = () => {
   const [filterDomain, setFilterDomain] = useState<String>("All");
   const [activeTab, setActiveTab] = useState<"history" | "resume">("history");
 
-  useEffect(() => {
-    if (!authLoading && !isLoggedIn) {
-      router.push("/login");
-    }
-  }, [isLoggedIn, authLoading, router]);
-
-  useEffect(() => {
-    if (isLoggedIn) fetchInterviews();
-  }, [isLoggedIn]);
-
-  if (isLoggedIn && (user?.role === "Mentor" || user?.role === "Administrator")) {
-    return <RBACManagementView />;
-  }
-
   const fetchInterviews = async () => {
     try {
       setDataLoading(true);
@@ -485,9 +471,23 @@ const page = () => {
       setDataLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (!authLoading && !isLoggedIn) {
+      router.push("/login");
+    }
+  }, [isLoggedIn, authLoading, router]);
+
+  useEffect(() => {
+    if (isLoggedIn && user?.role === "Student") {
+      fetchInterviews();
+    }
+  }, [isLoggedIn, user?.role]);
+
   const handleSelectDomain = (domain: string) => {
     router.push(`/interview?domain=${encodeURIComponent(domain)}`);
   };
+
   if (authLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -498,7 +498,12 @@ const page = () => {
       </div>
     );
   }
+
   if (!isLoggedIn) return null;
+
+  if (user?.role === "Mentor" || user?.role === "Administrator") {
+    return <RBACManagementView />;
+  }
 
   const avgScore = interviews.length
     ? Math.round(

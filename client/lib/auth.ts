@@ -3,6 +3,7 @@ const USER_KEY = 'user';
 
 export interface StoredUser {
     id: string;
+    _id?: string;
     name: string;
     email: string;
     role?: "Student" | "Mentor" | "Administrator";
