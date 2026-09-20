@@ -1,5 +1,5 @@
 const Groq = require("groq-sdk");
-const pdfjslib=require("pdfjs-dist/legacy/build/pdf.js");
+const { PDFParse } = require("pdf-parse");
 
 const getGroq = () => new Groq({ apiKey: process.env.GROQ_API_KEY });
 
@@ -13,18 +13,25 @@ const DOMAINS = [
   "Database Design",
   "General",
 ];
-async function extractTextFromPDF(buffer){
+
+async function extractTextFromPDF(buffer) {
+  try {
     const uint8Array = new Uint8Array(buffer);
-    const loadingTask = pdfjslib.getDocument({data: uint8Array});
-    const pdf = await loadingTask.promise;
-    let textContent = "";
-    for(let i=1;i<= pdf.numPages;i++){
-        const page = await pdf.getPage(i);
-        const content = await page.getTextContent();
-        const strings = content.items.map(item => item.str);
-        textContent += strings.join(" ") + "\n";
+    const parser = new PDFParse(uint8Array);
+    await parser.load();
+    const result = await parser.getText();
+    if (result && typeof result.text === "string" && result.text.trim()) {
+      return result.text;
     }
-    return textContent;
+    if (typeof result === "string" && result.trim()) {
+      return result;
+    }
+  } catch (err) {
+    console.warn("PDFParse warning, attempting raw string fallback:", err.message);
+  }
+  const rawStr = buffer.toString("binary");
+  const matches = rawStr.match(/[\x20-\x7E\s]{4,}/g);
+  return matches ? matches.join(" ") : buffer.toString("utf-8");
 } 
 const analyzeResume = async (req, res) => {
     try {
