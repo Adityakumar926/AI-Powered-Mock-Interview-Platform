@@ -16,6 +16,8 @@ export function Navbar() {
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
+  const isLandingPage = pathname === "/";
+
   // Scroll detection
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 12);
@@ -42,7 +44,6 @@ export function Navbar() {
 
   const isActive = (path: string) => pathname === path;
 
-  // User's first initial for avatar
   const initial = user?.name?.charAt(0).toUpperCase() ?? "U";
   const firstName = user?.name?.split(" ")[0] ?? "there";
 
@@ -69,9 +70,13 @@ export function Navbar() {
   return (
     <nav
       className={`sticky top-0 z-50 w-full transition-all duration-300 ${
-        scrolled
-          ? "bg-background/80 backdrop-blur-xl border-b border-border/60 shadow-sm"
-          : "bg-background border-b border-border/40"
+        isLandingPage
+          ? scrolled
+            ? "bg-black/90 backdrop-blur-xl border-b border-neutral-800 shadow-2xl text-white"
+            : "bg-black/80 backdrop-blur-md border-b border-neutral-900 text-white"
+          : scrolled
+            ? "bg-background/95 backdrop-blur-xl border-b border-border/80 shadow-md text-foreground"
+            : "bg-background/90 backdrop-blur-md border-b border-border/50 text-foreground"
       }`}
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -94,30 +99,35 @@ export function Navbar() {
               <span className="text-base font-black bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent tracking-tight">
                 MockInterview
               </span>
-              <span className="text-[10px] text-muted-foreground font-medium tracking-widest uppercase">
+              <span className={`text-[10px] font-semibold tracking-widest uppercase ${isLandingPage ? "text-neutral-400" : "text-muted-foreground"}`}>
                 AI Powered
               </span>
             </div>
           </Link>
 
           {/* ── Desktop Primary Nav Links ── */}
-          <div className="hidden md:flex items-center gap-1">
-            {primaryNavLinks.map((link) => (
-              <Link key={link.href} href={link.href}>
-                <button
-                  className={`relative px-3.5 py-1.5 text-xs font-semibold rounded-full transition-all duration-200 ${
-                    isActive(link.href)
-                      ? "text-primary bg-primary/10 font-bold"
-                      : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-                  }`}
-                >
-                  <span className="flex items-center gap-1.5">
-                    <span>{link.icon}</span>
-                    {link.label}
-                  </span>
-                </button>
-              </Link>
-            ))}
+          <div className="hidden md:flex items-center gap-1.5">
+            {primaryNavLinks.map((link) => {
+              const active = isActive(link.href);
+              return (
+                <Link key={link.href} href={link.href}>
+                  <button
+                    className={`relative px-3.5 py-1.5 text-xs font-bold rounded-xl transition-all duration-200 ${
+                      active
+                        ? "bg-primary text-primary-foreground shadow-sm"
+                        : isLandingPage
+                        ? "text-neutral-300 hover:text-white hover:bg-white/10"
+                        : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
+                    }`}
+                  >
+                    <span className="flex items-center gap-1.5">
+                      <span>{link.icon}</span>
+                      {link.label}
+                    </span>
+                  </button>
+                </Link>
+              );
+            })}
           </div>
 
           {/* ── Desktop Right Controls & User Dropdown ── */}
@@ -127,30 +137,42 @@ export function Navbar() {
                 {/* User Pill Button */}
                 <button
                   onClick={() => setUserDropdownOpen((v) => !v)}
-                  className="flex items-center gap-2 bg-muted/60 border border-border/60 hover:border-primary/40 rounded-full pl-1.5 pr-3 py-1 transition-colors"
+                  className={`flex items-center gap-2 border rounded-full pl-1.5 pr-3 py-1 transition-all ${
+                    isLandingPage
+                      ? "bg-neutral-900/90 border-neutral-700 text-white hover:border-primary/50"
+                      : "bg-card border-border/80 text-foreground hover:border-primary/50 shadow-sm"
+                  }`}
                 >
                   <div className="w-6 h-6 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center flex-shrink-0">
                     <span className="text-white text-[10px] font-black">
                       {initial}
                     </span>
                   </div>
-                  <span className="text-xs text-muted-foreground font-medium">
-                    Hi, <span className="text-foreground font-bold">{firstName}</span>
+                  <span className="text-xs font-medium">
+                    Hi, <span className="font-bold">{firstName}</span>
                   </span>
-                  <span className="text-[10px] text-muted-foreground">▾</span>
+                  <span className="text-[10px] opacity-70">▾</span>
                 </button>
 
                 {/* Dropdown Menu */}
                 {userDropdownOpen && (
-                  <div className="absolute right-0 mt-2 w-52 bg-background border border-border/80 rounded-2xl shadow-xl py-2 z-50 space-y-1">
+                  <div className={`absolute right-0 mt-2 w-52 rounded-2xl shadow-2xl py-2 z-50 space-y-1 border ${
+                    isLandingPage
+                      ? "bg-neutral-950 border-neutral-800 text-white"
+                      : "bg-background border-border/80 text-foreground"
+                  }`}>
                     <div className="px-4 py-2 border-b border-border/40">
-                      <p className="text-xs font-bold text-foreground truncate">{user?.name}</p>
+                      <p className="text-xs font-bold truncate">{user?.name}</p>
                       <p className="text-[10px] text-muted-foreground truncate">{user?.email}</p>
                     </div>
 
                     {userAccountLinks.map((item) => (
                       <Link key={item.href} href={item.href}>
-                        <div className="flex items-center gap-2.5 px-4 py-2 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors">
+                        <div className={`flex items-center gap-2.5 px-4 py-2 text-xs font-semibold transition-colors ${
+                          isLandingPage
+                            ? "text-neutral-300 hover:text-white hover:bg-white/10"
+                            : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
+                        }`}>
                           <span>{item.icon}</span>
                           <span>{item.label}</span>
                         </div>
@@ -160,75 +182,71 @@ export function Navbar() {
                     <div className="h-px bg-border/40 my-1" />
 
                     <button
-                      onClick={logout}
-                      className="w-full flex items-center gap-2.5 px-4 py-2 text-xs font-semibold text-red-600 dark:text-red-400 hover:bg-red-500/10 transition-colors text-left"
+                      onClick={() => {
+                        logout();
+                        router.push("/login");
+                      }}
+                      className="w-full text-left flex items-center gap-2.5 px-4 py-2 text-xs font-bold text-rose-500 hover:bg-rose-500/10 transition-colors"
                     >
                       <span>🚪</span>
-                      <span>Logout</span>
+                      <span>Sign Out</span>
                     </button>
                   </div>
                 )}
               </div>
             ) : (
               <div className="flex items-center gap-2">
-                <Link href="/login">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="rounded-full text-xs text-muted-foreground hover:text-foreground"
-                  >
-                    Login
-                  </Button>
-                </Link>
-                <Link href="/register">
-                  <Button
-                    size="sm"
-                    className="rounded-full bg-gradient-to-r from-primary to-accent hover:opacity-90 text-white shadow-md text-xs font-bold"
-                  >
-                    Get Started →
-                  </Button>
-                </Link>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => router.push("/login")}
+                  className={`text-xs font-bold rounded-full ${
+                    isLandingPage ? "text-neutral-200 hover:text-white hover:bg-white/10" : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  Login
+                </Button>
+
+                <Button
+                  size="sm"
+                  onClick={() => router.push("/register")}
+                  className="bg-gradient-to-r from-primary to-accent text-white text-xs font-bold rounded-full px-4 shadow-md hover:opacity-90 transition-all"
+                >
+                  Get Started →
+                </Button>
               </div>
             )}
           </div>
 
-          {/* ── Mobile Hamburger ── */}
-          <button
-            onClick={() => setMobileOpen((v) => !v)}
-            className="md:hidden relative w-9 h-9 flex flex-col items-center justify-center gap-1.5 rounded-xl hover:bg-muted/50 transition-colors"
-            aria-label="Toggle menu"
-          >
-            <span
-              className={`block h-0.5 w-5 bg-foreground rounded-full transition-all duration-300 origin-center ${
-                mobileOpen ? "rotate-45 translate-y-2" : ""
+          {/* ── Mobile Hamburger Button ── */}
+          <div className="flex md:hidden items-center gap-2">
+            <button
+              onClick={() => setMobileOpen((v) => !v)}
+              className={`p-2 rounded-xl transition-colors ${
+                isLandingPage ? "text-white hover:bg-white/10" : "text-foreground hover:bg-muted/60"
               }`}
-            />
-            <span
-              className={`block h-0.5 w-5 bg-foreground rounded-full transition-all duration-300 ${
-                mobileOpen ? "opacity-0 scale-x-0" : ""
-              }`}
-            />
-            <span
-              className={`block h-0.5 w-5 bg-foreground rounded-full transition-all duration-300 origin-center ${
-                mobileOpen ? "-rotate-45 -translate-y-2" : ""
-              }`}
-            />
-          </button>
+            >
+              <span className="text-lg">{mobileOpen ? "✕" : "☰"}</span>
+            </button>
+          </div>
+
         </div>
       </div>
 
-      {/* ── Mobile Menu Panel ── */}
+      {/* ── Mobile Menu ── */}
       {mobileOpen && (
-        <div className="md:hidden bg-background border-t border-border/50 px-4 py-4 space-y-1">
+        <div className={`md:hidden px-4 pt-2 pb-6 space-y-2 border-t ${
+          isLandingPage ? "bg-neutral-950 border-neutral-800 text-white" : "bg-background border-border/60 text-foreground"
+        }`}>
           {primaryNavLinks.map((link) => (
             <Link key={link.href} href={link.href}>
-              <div
-                className={`flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-semibold ${
-                  isActive(link.href)
-                    ? "bg-primary/10 text-primary font-bold"
-                    : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
-                }`}
-              >
+              <div className={`flex items-center gap-2.5 px-4 py-2.5 rounded-xl text-xs font-bold ${
+                isActive(link.href)
+                  ? "bg-primary text-primary-foreground"
+                  : isLandingPage
+                  ? "text-neutral-300 hover:bg-white/10"
+                  : "text-muted-foreground hover:bg-muted/60"
+              }`}>
                 <span>{link.icon}</span>
                 <span>{link.label}</span>
               </div>
@@ -238,22 +256,26 @@ export function Navbar() {
           {isLoggedIn && (
             <>
               <div className="h-px bg-border/40 my-2" />
-              <p className="px-4 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Account & Settings</p>
-              {userAccountLinks.map((link) => (
-                <Link key={link.href} href={link.href}>
-                  <div className="flex items-center gap-3 px-4 py-2 rounded-xl text-xs font-medium text-muted-foreground hover:bg-muted/50 hover:text-foreground">
-                    <span>{link.icon}</span>
-                    <span>{link.label}</span>
+              {userAccountLinks.map((item) => (
+                <Link key={item.href} href={item.href}>
+                  <div className={`flex items-center gap-2.5 px-4 py-2.5 rounded-xl text-xs font-semibold ${
+                    isLandingPage ? "text-neutral-300 hover:bg-white/10" : "text-muted-foreground hover:bg-muted/60"
+                  }`}>
+                    <span>{item.icon}</span>
+                    <span>{item.label}</span>
                   </div>
                 </Link>
               ))}
 
               <button
-                onClick={logout}
-                className="w-full mt-2 flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-bold text-red-600 hover:bg-red-500/10"
+                onClick={() => {
+                  logout();
+                  router.push("/login");
+                }}
+                className="w-full text-left flex items-center gap-2.5 px-4 py-2.5 rounded-xl text-xs font-bold text-rose-500 hover:bg-rose-500/10"
               >
                 <span>🚪</span>
-                <span>Logout</span>
+                <span>Sign Out</span>
               </button>
             </>
           )}

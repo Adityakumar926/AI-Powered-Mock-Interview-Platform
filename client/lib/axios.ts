@@ -27,7 +27,8 @@ axiosInstance.interceptors.request.use(
 axiosInstance.interceptors.response.use(
     (response) => response,
     (error) => {
-        if (error.response?.status === 401) {
+        const isLoginRequest = error.config?.url?.includes('/api/auth/login');
+        if (error.response?.status === 401 && !isLoginRequest) {
             // Clear stale auth data and redirect to login
             if (typeof window !== 'undefined') {
                 localStorage.removeItem('token');

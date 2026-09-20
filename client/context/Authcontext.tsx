@@ -136,16 +136,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [logout]);
 
   const value = useMemo<AuthContextValue>(
-    () => ({
-      user,
-      token,
-      isLoading,
-      isLoggedIn: !!token && !!user,
-      login,
-      register,
-      logout,
-      refreshUser,
-    }),
+    () => {
+      const activeToken = token || (typeof window !== "undefined" ? getToken() : null);
+      const activeUser = user || (typeof window !== "undefined" ? getStoredUser() : null);
+      return {
+        user: activeUser,
+        token: activeToken,
+        isLoading,
+        isLoggedIn: !!activeToken && !!activeUser,
+        login,
+        register,
+        logout,
+        refreshUser,
+      };
+    },
     [user, token, isLoading, login, register, logout, refreshUser],
   );
 
