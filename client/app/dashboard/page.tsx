@@ -90,19 +90,29 @@ function ResumePanel({
     try {
       const formData = new FormData();
       formData.append("resume", file);
-      const { data } = await axiosInstance.post(
-        "/api/resume/analyze",
-        formData
-      );
+      const token =
+        typeof window !== "undefined" ? localStorage.getItem("token") : null;
+      const baseUrl =
+        process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+      const res = await fetch(`${baseUrl}/api/resume/analyze`, {
+        method: "POST",
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: formData,
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(
+          data.error || data.message || "Failed to analyze resume",
+        );
+      }
       setAnalysis(data.analysis);
       setStep("results");
     } catch (error: any) {
-      const errMsg =
-        error?.response?.data?.error ||
-        error?.response?.data?.message ||
-        error?.message ||
-        "Failed to analyze resume. Please try again.";
-      setError(errMsg);
+      setError(
+        error?.message || "Failed to analyze resume. Please try again.",
+      );
       setStep("upload");
     } finally {
       clearInterval(interval);
