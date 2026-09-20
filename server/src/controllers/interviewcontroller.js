@@ -6,12 +6,12 @@ const getGroq = () => new Groq({ apiKey: process.env.GROQ_API_KEY });
 const systemPrompt = (domain) =>
   `
 You are a senior technical interviewer conducting a mock interview for a ${domain} developer role.
-Ask one clear, specific technical question at a time.
-After the candidate answers, provide feedback and the next question.
+Your job is to ask the candidate EXACTLY ONE short, professional technical question.
 
-Return ONLY the question, nothing else.
-
-
+STRICT CONSTRAINTS:
+- Do NOT answer the question.
+- Do NOT provide markdown tables, guides, explanations, or comparison lists.
+- Ask ONLY ONE single clear question (1-2 sentences).
 `.trim();
 
 // ── Start Interview ───────────────────────────────────────
@@ -21,15 +21,16 @@ const startInterview = async (req, res) => {
     if (!domain) return res.status(400).json({ message: "Domain is required" });
 
     const completion = await getGroq().chat.completions.create({
-      model: process.env.GROQ_MODEL || "groq/compound",
+      model: process.env.GROQ_MODEL || "qwen/qwen3.8-27b",
       messages: [
         { role: "system", content: systemPrompt(domain) },
         {
           role: "user",
-          content: `Start the interview. Ask me the first ${domain} technical question. Only ask the question, no preamble.`,
+          content: `Ask me the first technical interview question for a ${domain} position. Output ONLY the question in 1-2 sentences, nothing else.`,
         },
       ],
       temperature: 0.7,
+      max_tokens: 100,
     });
 
     const firstQuestion =
@@ -76,7 +77,7 @@ const submitAnswer = async (req, res) => {
 
     // 1️⃣ Generate feedback on the answer
     const feedbackResponse = await getGroq().chat.completions.create({
-      model: process.env.GROQ_MODEL || "groq/compound",
+      model: process.env.GROQ_MODEL || "qwen/qwen3.8-27b",
       messages: [
         {
           role: "user",
@@ -117,7 +118,7 @@ Return ONLY the feedback, no additional text.`,
     // ── Complete path ──────────────────────────────────────
     if (isComplete) {
       const scoreResponse = await getGroq().chat.completions.create({
-        model: process.env.GROQ_MODEL || "groq/compound",
+        model: process.env.GROQ_MODEL || "qwen/qwen3.8-27b",
         messages: [
           {
             role: "user",
@@ -149,24 +150,21 @@ Answer: "${answer}"`,
 
     // ── Continue path ──────────────────────────────────────
     const nextQuestionResponse = await getGroq().chat.completions.create({
-      model: process.env.GROQ_MODEL || "groq/compound",
+      model: process.env.GROQ_MODEL || "qwen/qwen3.8-27b",
       messages: [
         {
           role: "user",
-          content: `You are an expert ${domain} interviewer. Generate the NEXT interview question based on the previous answer.
-The question should:
-- Be different from typical generic interview questions
-- Build on topics relevant to ${domain}
-- Be open-ended and professional
-- Test deeper understanding of the domain
+          content: `You are an expert ${domain} interviewer. Generate the NEXT single interview question based on this context.
 
-Previous answer context: "${answer.substring(0, 100)}..."
+STRICT CONSTRAINTS:
+- Output ONLY the next question (1-2 sentences).
+- Do NOT answer it, do NOT include markdown tables, explanations, or long guides.
 
-Return ONLY the new question, nothing else.`,
+Previous answer context: "${answer.substring(0, 100)}..."`,
         },
       ],
       temperature: 0.7,
-      max_tokens: 150,
+      max_tokens: 100,
     });
 
     const nextQuestion = nextQuestionResponse.choices[0].message.content.trim();
