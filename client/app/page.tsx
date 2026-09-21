@@ -8,12 +8,14 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { getToken } from "@/lib/auth";
 
+const FRAME_COUNT = 50;
+
 export default function Home() {
   const router = useRouter();
   const containerRef = useRef<HTMLDivElement>(null);
-  const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [videoLoaded, setVideoLoaded] = useState(false);
+  const imagesRef = useRef<HTMLImageElement[]>([]);
+  const [framesLoaded, setFramesLoaded] = useState(false);
   const [activeTab, setActiveTab] = useState(0);
   const [activeFaq, setActiveFaq] = useState<number | null>(null);
 
@@ -54,84 +56,110 @@ export default function Home() {
     }
   }, [router]);
 
-  // ── 2. Production LERP Target Video & Canvas Engine (High-Contrast 60FPS) ──
+  // ── 2. Progressive Frame Preloader (ezgif-frame-001.png -> 050.png) ──
   useEffect(() => {
-    const vid = videoRef.current;
+    let loadedCount = 0;
+    const images: HTMLImageElement[] = [];
+
+    for (let i = 1; i <= FRAME_COUNT; i++) {
+      const img = new Image();
+      const numStr = String(i).padStart(3, "0");
+      img.src = `/frames/ezgif-frame-${numStr}.png`;
+      img.onload = () => {
+        loadedCount++;
+        if (loadedCount >= 1) {
+          setFramesLoaded(true);
+        }
+      };
+      images.push(img);
+    }
+    imagesRef.current = images;
+  }, []);
+
+  // ── 3. High-DPR Retina Scroll-Driven Canvas Engine with Smooth LERP Easing ──
+  useEffect(() => {
     const canvas = canvasRef.current;
-    if (!vid || !canvas) return;
+    if (!canvas) return;
 
     const ctx = canvas.getContext("2d");
-    let animationFrameId: number;
+    if (!ctx) return;
 
-    let targetTime = 0;
-    let currentTime = 0;
+    let animationFrameId: number;
+    let currentFrame = 0;
 
     const handleResize = () => {
       if (canvas) {
-        canvas.width = window.innerWidth;
-        canvas.height = window.innerHeight;
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        canvas.width = window.innerWidth * dpr;
+        canvas.height = window.innerHeight * dpr;
       }
     };
 
-    const renderCanvas = () => {
-      if (!vid || !ctx || !canvas) return;
-      if (vid.readyState >= 2) {
-        const vWidth = vid.videoWidth || 1280;
-        const vHeight = vid.videoHeight || 720;
-        const cWidth = canvas.width;
-        const cHeight = canvas.height;
+    const drawFrame = (frameIndex: number) => {
+      if (!canvas || !ctx) return;
+      const images = imagesRef.current;
+      if (!images || images.length === 0) return;
 
-        const vAspect = vWidth / vHeight;
-        const cAspect = cWidth / cHeight;
+      const idx = Math.max(0, Math.min(FRAME_COUNT - 1, Math.round(frameIndex)));
+      const img = images[idx];
+      if (!img || !img.complete || img.naturalWidth === 0) return;
 
-        let drawWidth = cWidth;
-        let drawHeight = cHeight;
-        let offsetX = 0;
-        let offsetY = 0;
+      const cWidth = canvas.width;
+      const cHeight = canvas.height;
 
-        if (cAspect > vAspect) {
-          drawHeight = cWidth / vAspect;
-          offsetY = (cHeight - drawHeight) / 2;
-        } else {
-          drawWidth = cHeight * vAspect;
-          offsetX = (cWidth - drawWidth) / 2;
-        }
+      const iWidth = img.naturalWidth;
+      const iHeight = img.naturalHeight;
 
-        ctx.clearRect(0, 0, cWidth, cHeight);
-        ctx.drawImage(vid, offsetX, offsetY, drawWidth, drawHeight);
+      const iAspect = iWidth / iHeight;
+      const cAspect = cWidth / cHeight;
+
+      let drawWidth = cWidth;
+      let drawHeight = cHeight;
+      let offsetX = 0;
+      let offsetY = 0;
+
+      if (cAspect > iAspect) {
+        drawHeight = cWidth / iAspect;
+        offsetY = (cHeight - drawHeight) / 2;
+      } else {
+        drawWidth = cHeight * iAspect;
+        offsetX = (cWidth - drawWidth) / 2;
       }
+
+      // Deep dark luxury background fill
+      ctx.fillStyle = "#050403";
+      ctx.fillRect(0, 0, cWidth, cHeight);
+
+      // Render crisp image frame
+      ctx.drawImage(img, offsetX, offsetY, drawWidth, drawHeight);
     };
 
-    const updateVideoLoop = () => {
-      if (vid && vid.duration && !isNaN(vid.duration)) {
-        const progress = scrollYProgress.get();
-        targetTime = Math.max(0, Math.min(vid.duration - 0.05, progress * vid.duration));
+    const updateLoop = () => {
+      const progress = scrollYProgress.get();
+      const clampedProgress = Math.max(0, Math.min(1, progress));
+      const targetFrame = clampedProgress * (FRAME_COUNT - 1);
 
-        // LERP Smooth Target Interpolation
-        const diff = targetTime - currentTime;
-        currentTime += diff * 0.12;
+      const prefersReduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-        if (vid.readyState >= 2 && !vid.seeking && Math.abs(vid.currentTime - currentTime) > 0.02) {
-          vid.currentTime = currentTime;
-        }
-
-        renderCanvas();
+      if (prefersReduced) {
+        currentFrame = targetFrame;
+      } else {
+        // Smooth Apple-style LERP interpolation
+        currentFrame += (targetFrame - currentFrame) * 0.15;
       }
 
-      animationFrameId = requestAnimationFrame(updateVideoLoop);
+      drawFrame(currentFrame);
+      animationFrameId = requestAnimationFrame(updateLoop);
     };
 
     window.addEventListener("resize", handleResize);
     handleResize();
-    animationFrameId = requestAnimationFrame(updateVideoLoop);
 
-    const onSeeked = () => renderCanvas();
-    vid.addEventListener("seeked", onSeeked);
+    animationFrameId = requestAnimationFrame(updateLoop);
 
     return () => {
       window.removeEventListener("resize", handleResize);
       cancelAnimationFrame(animationFrameId);
-      if (vid) vid.removeEventListener("seeked", onSeeked);
     };
   }, [scrollYProgress]);
 
@@ -216,7 +244,7 @@ export default function Home() {
 
   const faqs = [
     {
-      q: "How does the 3D AI engine evaluate my answers?",
+      q: "How does the AI engine evaluate my answers?",
       a: "Our platform leverages high-speed Groq LLM inference to analyze your answers across 4 core dimensions: Technical Accuracy, Communication Clarity, Problem-Solving Structure, and Seniority Benchmark.",
     },
     {
@@ -234,39 +262,28 @@ export default function Home() {
   ];
 
   return (
-    <div className="min-h-screen bg-black text-white selection:bg-blue-600 selection:text-white">
+    <div className="min-h-screen bg-[#050403] text-white selection:bg-amber-600 selection:text-white">
       
       {/* ── 3D HEAVY INERTIA LERP SCROLLYTETLLING CANVAS & STICKY HERO WRAPPER (600vh) ── */}
       <div ref={containerRef} className="relative h-[600vh] w-full">
         
         {/* Sticky 3D Background Canvas Layer */}
-        <div className="sticky top-0 h-screen w-full overflow-hidden z-0 bg-black">
+        <div className="sticky top-0 h-screen w-full overflow-hidden z-0 bg-[#050403]">
           
-          {/* Hidden preloading video element */}
-          <video
-            ref={videoRef}
-            src="/hero-video.mp4"
-            muted
-            playsInline
-            preload="auto"
-            onLoadedData={() => setVideoLoaded(true)}
-            className="hidden"
-          />
-
-          {/* Ultra Crisp High-Contrast 60FPS Canvas Layer */}
+          {/* Ultra Crisp High-Contrast Retina Canvas Layer */}
           <canvas
             ref={canvasRef}
-            className="h-full w-full object-cover opacity-100 filter brightness-105 contrast-110 saturate-110 transition-opacity duration-500"
+            className="h-full w-full object-cover opacity-100 transition-opacity duration-500"
           />
           
-          {/* Minimal Pure Black Vignettes */}
-          <div className="absolute top-0 inset-x-0 h-32 bg-gradient-to-b from-black to-transparent pointer-events-none" />
-          <div className="absolute bottom-0 inset-x-0 h-32 bg-gradient-to-t from-black to-transparent pointer-events-none" />
+          {/* Minimal Deep Luxury Gold & Pure Black Vignettes */}
+          <div className="absolute top-0 inset-x-0 h-32 bg-gradient-to-b from-[#050403] via-[#050403]/60 to-transparent pointer-events-none" />
+          <div className="absolute bottom-0 inset-x-0 h-32 bg-gradient-to-t from-[#050403] via-[#050403]/60 to-transparent pointer-events-none" />
           
           {/* Fallback loading indicator */}
-          {!videoLoaded && (
-            <div className="absolute inset-0 bg-black animate-pulse flex items-center justify-center">
-              <p className="text-xs text-blue-400 font-mono">Loading 3D Crisp Graphics…</p>
+          {!framesLoaded && (
+            <div className="absolute inset-0 bg-[#050403] animate-pulse flex items-center justify-center">
+              <p className="text-xs text-amber-400/80 font-mono tracking-widest">Preloading Cinematic Sequence…</p>
             </div>
           )}
         </div>
@@ -278,13 +295,13 @@ export default function Home() {
             className="text-center max-w-4xl space-y-6 pointer-events-auto bg-slate-950/85 backdrop-blur-xl p-8 sm:p-12 rounded-3xl border border-blue-500/30 shadow-[0_25px_60px_rgba(0,0,0,0.95)] text-white"
           >
             <div className="inline-flex items-center gap-2 text-xs font-bold text-blue-300 bg-blue-950/70 border border-blue-500/40 backdrop-blur-md px-4 py-2 rounded-full uppercase tracking-wider shadow-lg">
-              <span>✨</span> 3D AI-Powered Placement Engine
+              <span>✨</span> AI-Powered Placement Engine
             </div>
 
             <h1 className="text-4xl sm:text-6xl md:text-7xl font-black tracking-tight text-white leading-[1.1] drop-shadow-[0_10px_25px_rgba(0,0,0,0.9)]">
               Master Technical Interviews With{" "}
               <span className="bg-gradient-to-r from-blue-400 via-indigo-300 to-purple-400 bg-clip-text text-transparent drop-shadow-none">
-                3D Real-Time AI
+                Real-Time Adaptive AI
               </span>
             </h1>
 
@@ -312,7 +329,7 @@ export default function Home() {
 
             {/* Scroll Indicator Prompt */}
             <div className="pt-6 flex flex-col items-center gap-2 text-xs text-blue-300 font-mono animate-bounce drop-shadow">
-              <span>Scroll for 3D Feature Fly-Through</span>
+              <span>Scroll for Interactive Feature Fly-Through</span>
               <span>↓</span>
             </div>
           </motion.div>
@@ -453,7 +470,7 @@ export default function Home() {
             How Our AI Architecture Operates
           </h2>
           <p className="text-base text-slate-400 max-w-2xl mx-auto">
-            Not a static question bank. A genuine 3D intelligence engine designed for engineering mastery.
+            Not a static question bank. A genuine adaptive intelligence engine designed for engineering mastery.
           </p>
         </div>
 
@@ -520,7 +537,7 @@ export default function Home() {
       <section className="relative max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-20 z-20 border-t border-neutral-900 bg-black">
         <div className="text-center mb-12 space-y-2">
           <h2 className="text-3xl sm:text-4xl font-black text-white">Frequently Asked Questions</h2>
-          <p className="text-sm text-slate-400">Everything you need to know about our 3D AI platform</p>
+          <p className="text-sm text-slate-400">Everything you need to know about our AI Mock Interview platform</p>
         </div>
 
         <div className="space-y-3">
@@ -552,7 +569,7 @@ export default function Home() {
             Ready to Master Your Next Technical Round?
           </h2>
           <p className="text-base text-slate-300 max-w-2xl mx-auto">
-            Start practicing immediately with your personalized 3D AI interviewer. Free to start.
+            Start practicing immediately with your personalized AI interviewer. Free to start.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center pt-2">
             <Button
